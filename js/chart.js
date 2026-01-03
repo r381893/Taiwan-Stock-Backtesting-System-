@@ -93,9 +93,54 @@ function initSignalChart() {
 }
 
 // Initialize the market trend chart (3yr/5yr/10yr)
-function initTrendChart(years = 5) {
+async function initTrendChart(years = 5) {
     const ctx = document.getElementById('trendChart').getContext('2d');
-    const { dates, prices, maValues } = window.appData.generateTrendData(years);
+    let chartData;
+
+    try {
+        // Calculate start date
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setFullYear(endDate.getFullYear() - years);
+
+        const startDateStr = startDate.toISOString().split('T')[0];
+        const endDateStr = endDate.toISOString().split('T')[0];
+
+        // Fetch real data
+        console.log(`[TrendChart] Fetching data from ${startDateStr} to ${endDateStr}...`);
+        const response = await window.appData.fetchMarketData(startDateStr, endDateStr);
+
+        if (response && response.success && response.data.length > 0) {
+            const dates = response.data.map(d => d.date);
+            const prices = response.data.map(d => d.close);
+
+            // Calculate MA (60 days for trend)
+            const maPeriod = 60;
+            const maValues = [];
+            for (let i = 0; i < prices.length; i++) {
+                if (i < maPeriod - 1) {
+                    maValues.push(null);
+                    continue;
+                }
+                let sum = 0;
+                for (let j = 0; j < maPeriod; j++) {
+                    sum += prices[i - j];
+                }
+                maValues.push(sum / maPeriod);
+            }
+
+            chartData = { dates, prices, maValues };
+            console.log(`[TrendChart] Loaded ${prices.length} data points from API`);
+        } else {
+            throw new Error('API returned no data');
+        }
+
+    } catch (error) {
+        console.warn('[TrendChart] Failed to load real data, using mock data:', error);
+        chartData = window.appData.generateTrendData(years);
+    }
+
+    const { dates, prices, maValues } = chartData;
 
     // Destroy existing chart if any
     if (trendChart) {
