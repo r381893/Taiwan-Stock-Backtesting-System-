@@ -423,26 +423,47 @@ function initRadioButtons() {
 }
 
 /**
- * Update market display with current data
+ * Update market display with current data (from API or fallback)
  */
-function updateMarketDisplay() {
-    const { marketData, formatNumber, calculateSignal } = window.appData;
+async function updateMarketDisplay() {
+    const { formatNumber, calculateSignal, fetchMarketStatus, marketData } = window.appData;
+    const maDays = parseInt(document.getElementById('maDays').value) || 13;
+
+    let latestPrice, maValue, latestDate;
+
+    // Try to fetch real data from API
+    try {
+        const status = await fetchMarketStatus(maDays);
+        if (status && status.success) {
+            latestPrice = status.latestPrice;
+            maValue = status.maValue;
+            latestDate = status.latestDate;
+            console.log('[Market] Real data loaded:', latestPrice, maValue);
+        } else {
+            throw new Error('API returned unsuccessful');
+        }
+    } catch (error) {
+        console.warn('[Market] API failed, using fallback data:', error);
+        latestPrice = marketData.latestPrice;
+        maValue = marketData.ma13;
+        latestDate = marketData.latestDate;
+    }
 
     // Update date
-    document.getElementById('updateTime').textContent = '更新於 ' + marketData.latestDate;
+    document.getElementById('updateTime').textContent = '更新於 ' + latestDate;
 
     // Update price values
-    document.getElementById('latestPrice').textContent = formatNumber(marketData.latestPrice, 2);
-    document.getElementById('maValue').textContent = formatNumber(marketData.ma13, 2);
+    document.getElementById('latestPrice').textContent = formatNumber(latestPrice, 2);
+    document.getElementById('maValue').textContent = formatNumber(maValue, 2);
 
     // Calculate and display price difference
-    const diff = marketData.latestPrice - marketData.ma13;
+    const diff = latestPrice - maValue;
     const diffElement = document.getElementById('priceDiff');
     diffElement.textContent = (diff >= 0 ? '+' : '') + formatNumber(diff, 2);
     diffElement.className = 'stat-value ' + (diff >= 0 ? 'positive' : 'negative');
 
     // Update signal
-    const signal = calculateSignal(marketData.latestPrice, marketData.ma13);
+    const signal = calculateSignal(latestPrice, maValue);
     const signalBox = document.getElementById('signalBox');
     const signalText = document.getElementById('signalText');
     const signalReason = document.getElementById('signalReason');
@@ -452,11 +473,11 @@ function updateMarketDisplay() {
     if (signal === 'long') {
         signalBox.querySelector('.signal-icon').textContent = '📈';
         signalText.textContent = '做多';
-        signalReason.textContent = `收盤價 > ${document.getElementById('maDays').value}日均線`;
+        signalReason.textContent = `收盤價 > ${maDays}日均線`;
     } else {
         signalBox.querySelector('.signal-icon').textContent = '📉';
         signalText.textContent = '做空';
-        signalReason.textContent = `收盤價 < ${document.getElementById('maDays').value}日均線`;
+        signalReason.textContent = `收盤價 < ${maDays}日均線`;
     }
 }
 
