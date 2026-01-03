@@ -257,6 +257,90 @@ function initMddChart() {
     return mddChart;
 }
 
+// Initialize the MDD chart with real data from API
+function initMddChartWithData(dates, mddValues) {
+    const ctx = document.getElementById('mddChart').getContext('2d');
+
+    if (mddChart) {
+        mddChart.destroy();
+    }
+
+    // Sample data for better performance if too many data points
+    let sampledDates = dates;
+    let sampledValues = mddValues;
+
+    if (dates.length > 500) {
+        const step = Math.ceil(dates.length / 500);
+        sampledDates = dates.filter((_, i) => i % step === 0);
+        sampledValues = mddValues.filter((_, i) => i % step === 0);
+    }
+
+    // Convert positive drawdowns to negative for display
+    const displayValues = sampledValues.map(v => -Math.abs(v));
+
+    mddChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: sampledDates,
+            datasets: [{
+                label: '最大回撤 (%)',
+                data: displayValues,
+                borderColor: 'rgb(244, 63, 94)',
+                backgroundColor: 'rgba(244, 63, 94, 0.1)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 0,
+                pointHoverRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                    titleColor: '#fff',
+                    bodyColor: '#f43f5e',
+                    cornerRadius: 8,
+                    callbacks: {
+                        label: function (context) {
+                            return '回撤: ' + context.raw.toFixed(2) + '%';
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: {
+                        color: '#64748b',
+                        font: { size: 10 },
+                        callback: function (value, index, values) {
+                            const step = Math.ceil(values.length / 12);
+                            return index % step === 0 ? this.getLabelForValue(value) : '';
+                        }
+                    }
+                },
+                y: {
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: {
+                        color: '#64748b',
+                        callback: function (value) { return value.toFixed(0) + '%'; }
+                    },
+                    max: 0,
+                    suggestedMin: -50
+                }
+            },
+            animation: { duration: 1200, easing: 'easeOutQuart' }
+        }
+    });
+
+    return mddChart;
+}
+
+
 // Update signal chart
 function updateSignalChart() {
     if (signalChart) {
@@ -292,6 +376,7 @@ window.chartModule = {
     initSignalChart,
     initTrendChart,
     initMddChart,
+    initMddChartWithData,
     updateSignalChart,
     updateMddChart,
     destroyCharts

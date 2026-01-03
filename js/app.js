@@ -487,9 +487,9 @@ function toggleTradesTable() {
 }
 
 /**
- * Run backtest simulation
+ * Run backtest simulation (with real API support)
  */
-function runBacktest() {
+async function runBacktest() {
     const btn = document.getElementById('runBacktest');
     const resultsCard = document.getElementById('resultsCard');
     const mddCard = document.getElementById('mddCard');
@@ -499,62 +499,210 @@ function runBacktest() {
     btn.disabled = true;
     btn.innerHTML = '<span class="btn-icon">⏳</span><span>執行中...</span>';
 
-    setTimeout(() => {
-        const { sampleBacktestResults, formatCurrency, formatPercent, generateTop3MA, generateSampleTrades } = window.appData;
+    try {
+        // Collect parameters from form
+        const params = collectBacktestParams();
 
-        // Handle auto-optimization - show top 3 results
-        if (autoOptimize.checked) {
-            const minMA = parseInt(document.getElementById('maMin').value) || 5;
-            const maxMA = parseInt(document.getElementById('maMax').value) || 60;
-            const top3 = generateTop3MA(minMA, maxMA);
-            populateTop3Results(top3);
+        // Check if API is available
+        const apiAvailable = await window.appData.checkAPIAvailable();
 
-            // Update MA label to show selected MA
-            document.getElementById('maLabel').textContent = top3[0].ma;
+        if (apiAvailable && window.appData.USE_REAL_API) {
+            // Use real API
+            await runRealBacktest(params, autoOptimize.checked);
+        } else {
+            // Fallback to mock data
+            console.log('Using mock data...');
+            await runMockBacktest(autoOptimize.checked);
         }
 
-        // Get selected dates
-        const startDate = document.getElementById('startDate').value;
-        const endDate = document.getElementById('endDate').value;
-
-        // Update results
-        document.getElementById('resultPeriod').textContent = `${startDate} ~ ${endDate}`;
-        document.getElementById('resultFinal').textContent = formatCurrency(sampleBacktestResults.finalAssets);
-
-        const returnElement = document.getElementById('resultReturn');
-        returnElement.textContent = formatPercent(sampleBacktestResults.totalReturn);
-        returnElement.style.color = sampleBacktestResults.totalReturn >= 0 ? '#10b981' : '#f43f5e';
-
-        document.getElementById('resultMDD').textContent = formatPercent(sampleBacktestResults.maxDrawdown);
-        document.getElementById('resultWinRate').textContent = sampleBacktestResults.winRate + '%';
-        document.getElementById('resultTrades').textContent = sampleBacktestResults.tradeCount + ' 次';
-
-        // Show results card
-        resultsCard.style.display = 'block';
-        resultsCard.style.animation = 'fadeIn 0.5s ease forwards';
-
-        // Show MDD chart
-        mddCard.style.display = 'block';
-        mddCard.style.animation = 'fadeIn 0.5s ease forwards';
-        window.chartModule.initMddChart();
-
-        // Show trades table
-        tradesCard.style.display = 'block';
-        tradesCard.style.animation = 'fadeIn 0.5s ease forwards';
-        populateTradesTable(generateSampleTrades());
-
-        // Update signal chart
-        window.chartModule.updateSignalChart();
-
+    } catch (error) {
+        console.error('Backtest error:', error);
+        showToast('回測執行失敗：' + error.message, 'error');
+    } finally {
         // Reset button
         btn.disabled = false;
         btn.innerHTML = '<span class="btn-icon">▶️</span><span>執行回測</span><div class="btn-shine"></div>';
-
-        // Scroll to results
-        resultsCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-    }, 1500);
+    }
 }
+
+/**
+ * Collect backtest parameters from form
+ */
+function collectBacktestParams() {
+    return {
+        startDate: document.getElementById('startDate').value,
+        endDate: document.getElementById('endDate').value,
+        maDays: parseInt(document.getElementById('maDays').value) || 13,
+        tradeMode: document.getElementById('tradeMode').value || 'long',
+        initialCapital: parseInt(document.getElementById('initialCapital').value) || 1000000,
+        monthlyAdd: parseInt(document.getElementById('monthlyAdd').value) || 0,
+        useFixedLeverage: document.getElementById('useFixedLeverage').checked,
+        fixedLeverage: parseInt(document.getElementById('fixedLeverage').value) || 1,
+        useDynamicLeverage: document.getElementById('useDynamicLeverage').checked,
+        dynamicLeverage: parseInt(document.getElementById('dynamicLeverage').value) || 2,
+        enableRebalance: document.getElementById('enableRebalance').checked,
+        rebalancePeriod: parseInt(document.getElementById('rebalancePeriod').value) || 1,
+        pointValue: parseInt(document.getElementById('pointValue').value) || 50,
+        lotMode: document.getElementById('useDynamicLeverage').checked ? 'dynamic' : 'fixed',
+        fixedLots: 1,
+        useFee: true,
+        buyFee: 35,
+        sellFee: 35
+    };
+}
+
+/**
+ * Run backtest using real API
+ */
+async function runRealBacktest(params, doOptimize) {
+    const resultsCard = document.getElementById('resultsCard');
+    const mddCard = document.getElementById('mddCard');
+    const tradesCard = document.getElementById('tradesCard');
+    const { formatCurrency, formatPercent } = window.appData;
+
+    // Handle auto-optimization
+    if (doOptimize) {
+        const minMA = parseInt(document.getElementById('maMin').value) || 5;
+        const maxMA = parseInt(document.getElementById('maMax').value) || 60;
+
+        const optimizeParams = {
+            ...params,
+            maMin: minMA,
+            maMax: maxMA
+        };
+
+        const optimizeResult = await window.appData.optimizeMAAPI(optimizeParams);
+
+        if (optimizeResult.success && optimizeResult.top3) {
+            // Convert API result format to match existing populateTop3Results
+            const top3 = optimizeResult.top3.map((r, i) => ({
+                rank: i + 1,
+                ma: r.ma,
+                totalReturn: r.totalReturn,
+                avgReturn: r.avgReturn || r.totalReturn / Math.max(r.tradeCount || 1, 1)
+            }));
+
+            populateTop3Results(top3);
+
+            // Update MA to use the best one
+            params.maDays = top3[0].ma;
+            document.getElementById('maLabel').textContent = top3[0].ma;
+        }
+    }
+
+    // Run backtest
+    const result = await window.appData.runBacktestAPI(params);
+
+    if (!result.success) {
+        throw new Error(result.error || '回測失敗');
+    }
+
+    const { results, trades, mddHistory, capitalHistory } = result;
+
+    // Update results display
+    document.getElementById('resultPeriod').textContent = results.period;
+    document.getElementById('resultFinal').textContent = formatCurrency(results.finalAssets);
+
+    const returnElement = document.getElementById('resultReturn');
+    returnElement.textContent = formatPercent(results.totalReturn);
+    returnElement.style.color = results.totalReturn >= 0 ? '#10b981' : '#f43f5e';
+
+    document.getElementById('resultMDD').textContent = formatPercent(results.maxDrawdown);
+    document.getElementById('resultWinRate').textContent = results.winRate + '%';
+    document.getElementById('resultTrades').textContent = results.tradeCount + ' 次';
+
+    // Show results card
+    resultsCard.style.display = 'block';
+    resultsCard.style.animation = 'fadeIn 0.5s ease forwards';
+
+    // Show MDD chart with real data
+    mddCard.style.display = 'block';
+    mddCard.style.animation = 'fadeIn 0.5s ease forwards';
+    if (mddHistory && mddHistory.dates && mddHistory.values) {
+        window.chartModule.initMddChartWithData(mddHistory.dates, mddHistory.values);
+    } else {
+        window.chartModule.initMddChart();
+    }
+
+    // Show trades table with real data
+    tradesCard.style.display = 'block';
+    tradesCard.style.animation = 'fadeIn 0.5s ease forwards';
+    if (trades && trades.length > 0) {
+        populateTradesTable(trades);
+    } else {
+        document.getElementById('tradesTableBody').innerHTML =
+            '<tr><td colspan="11" style="text-align:center;">無交易記錄</td></tr>';
+    }
+
+    // Update signal chart
+    window.chartModule.updateSignalChart();
+
+    // Scroll to results
+    resultsCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    showToast('回測完成！', 'success');
+}
+
+/**
+ * Run backtest using mock data (fallback)
+ */
+async function runMockBacktest(doOptimize) {
+    const resultsCard = document.getElementById('resultsCard');
+    const mddCard = document.getElementById('mddCard');
+    const tradesCard = document.getElementById('tradesCard');
+    const { sampleBacktestResults, formatCurrency, formatPercent, generateTop3MA, generateSampleTrades } = window.appData;
+
+    // Simulate delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Handle auto-optimization
+    if (doOptimize) {
+        const minMA = parseInt(document.getElementById('maMin').value) || 5;
+        const maxMA = parseInt(document.getElementById('maMax').value) || 60;
+        const top3 = generateTop3MA(minMA, maxMA);
+        populateTop3Results(top3);
+        document.getElementById('maLabel').textContent = top3[0].ma;
+    }
+
+    // Get selected dates
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+
+    // Update results
+    document.getElementById('resultPeriod').textContent = `${startDate} ~ ${endDate}`;
+    document.getElementById('resultFinal').textContent = formatCurrency(sampleBacktestResults.finalAssets);
+
+    const returnElement = document.getElementById('resultReturn');
+    returnElement.textContent = formatPercent(sampleBacktestResults.totalReturn);
+    returnElement.style.color = sampleBacktestResults.totalReturn >= 0 ? '#10b981' : '#f43f5e';
+
+    document.getElementById('resultMDD').textContent = formatPercent(sampleBacktestResults.maxDrawdown);
+    document.getElementById('resultWinRate').textContent = sampleBacktestResults.winRate + '%';
+    document.getElementById('resultTrades').textContent = sampleBacktestResults.tradeCount + ' 次';
+
+    // Show results card
+    resultsCard.style.display = 'block';
+    resultsCard.style.animation = 'fadeIn 0.5s ease forwards';
+
+    // Show MDD chart
+    mddCard.style.display = 'block';
+    mddCard.style.animation = 'fadeIn 0.5s ease forwards';
+    window.chartModule.initMddChart();
+
+    // Show trades table
+    tradesCard.style.display = 'block';
+    tradesCard.style.animation = 'fadeIn 0.5s ease forwards';
+    populateTradesTable(generateSampleTrades());
+
+    // Update signal chart
+    window.chartModule.updateSignalChart();
+
+    // Scroll to results
+    resultsCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    showToast('回測完成（使用模擬數據）', 'info');
+}
+
 
 /**
  * Populate trades table with data (including contracts and reasons)

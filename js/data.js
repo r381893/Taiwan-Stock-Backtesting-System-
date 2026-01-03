@@ -1,7 +1,128 @@
 /**
- * Sample Data for Taiwan Stock Backtesting System
- * 模擬數據用於展示
+ * Data Module for Taiwan Stock Backtesting System
+ * 資料模組 - 支援真實 API 與模擬數據
  */
+
+// ============================================
+// API 配置
+// ============================================
+// 自動偵測環境：本地開發使用 localhost:5000，線上部署使用當前 origin
+const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:5000'
+    : window.location.origin;
+
+// 是否使用真實 API（設為 false 則使用模擬數據）
+let USE_REAL_API = true;
+
+// ============================================
+// API 調用函數
+// ============================================
+
+/**
+ * 從 API 獲取股市歷史資料
+ */
+async function fetchMarketData(startDate, endDate) {
+    try {
+        let url = `${API_BASE}/api/data`;
+        const params = new URLSearchParams();
+        if (startDate) params.append('startDate', startDate);
+        if (endDate) params.append('endDate', endDate);
+        if (params.toString()) url += '?' + params.toString();
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.success) {
+            return data;
+        } else {
+            console.error('API Error:', data.error);
+            return null;
+        }
+    } catch (error) {
+        console.error('Fetch Error:', error);
+        return null;
+    }
+}
+
+/**
+ * 從 API 獲取最新市場狀態
+ */
+async function fetchMarketStatus(maDays = 13) {
+    try {
+        const response = await fetch(`${API_BASE}/api/market?maDays=${maDays}`);
+        const data = await response.json();
+
+        if (data.success) {
+            return data;
+        } else {
+            console.error('API Error:', data.error);
+            return null;
+        }
+    } catch (error) {
+        console.error('Fetch Error:', error);
+        return null;
+    }
+}
+
+/**
+ * 調用 API 執行回測
+ */
+async function runBacktestAPI(params) {
+    try {
+        const response = await fetch(`${API_BASE}/api/backtest`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(params)
+        });
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Backtest API Error:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * 調用 API 執行均線優化
+ */
+async function optimizeMAAPI(params) {
+    try {
+        const response = await fetch(`${API_BASE}/api/optimize`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(params)
+        });
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Optimize API Error:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * 檢查 API 伺服器是否可用
+ */
+async function checkAPIAvailable() {
+    try {
+        const response = await fetch(`${API_BASE}/`, {
+            method: 'GET',
+            signal: AbortSignal.timeout(3000)
+        });
+        return response.ok;
+    } catch (error) {
+        console.warn('API server not available, using mock data');
+        return false;
+    }
+}
+
+// ============================================
+// 原有函數（保留作為備用）
+// ============================================
 
 // Get today's date string
 function getTodayString() {
@@ -331,8 +452,20 @@ function formatPercent(num) {
 
 // Export data and functions
 window.appData = {
+    // API functions
+    API_BASE,
+    USE_REAL_API,
+    fetchMarketData,
+    fetchMarketStatus,
+    runBacktestAPI,
+    optimizeMAAPI,
+    checkAPIAvailable,
+
+    // Mock data (fallback)
     marketData,
     sampleBacktestResults,
+
+    // Utility functions
     getTodayString,
     generateSignalData,
     generateTrendData,
