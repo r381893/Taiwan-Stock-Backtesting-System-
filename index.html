@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>台股加權指數回測系統 | Taiwan Stock Backtesting</title>
+    <meta name="description" content="專業的台股加權指數回測系統，使用移動平均線策略進行歷史數據分析與回測">
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#0a0f1a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="台股回測">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/style.css">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+
+<body class="theme-auto">
+    <!-- Background Animation -->
+    <div class="bg-gradient"></div>
+    <div class="bg-grid"></div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <div class="logo">
+                <span class="logo-icon">📊</span>
+                <h1>台股加權指數回測系統</h1>
+            </div>
+            <span class="badge">v2.5 Pro</span>
+        </div>
+        <div class="header-center">
+            <!-- Theme Selector -->
+            <div class="theme-selector">
+                <span class="theme-label">配色</span>
+                <div class="theme-buttons">
+                    <button class="theme-btn active" data-theme="auto" title="自動（根據盤勢）">🔄</button>
+                    <button class="theme-btn" data-theme="bull" title="多方紅色">🔴</button>
+                    <button class="theme-btn" data-theme="bear" title="空方綠色">🟢</button>
+                    <button class="theme-btn" data-theme="neutral" title="盤整橘色">🟠</button>
+                </div>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="live-clock" id="liveClock">
+                <span class="clock-icon">🕐</span>
+                <span id="currentTime">--:--:--</span>
+            </div>
+            <div class="market-status" id="marketStatus">
+                <span class="status-dot"></span>
+                <span>休市中</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Mobile Menu Button -->
+    <button class="hamburger-menu" id="hamburgerMenu" aria-label="開啟選單">
+        <span></span>
+        <span></span>
+        <span></span>
+    </button>
+
+    <!-- Mobile Backdrop -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+    <!-- Install PWA Prompt -->
+    <div class="install-prompt" id="installPrompt" style="display: none;">
+        <div class="install-content">
+            <span class="install-icon">📲</span>
+            <div class="install-text">
+                <strong>加入主畫面</strong>
+                <span>像 App 一樣使用</span>
+            </div>
+            <button class="install-btn" id="installBtn">安裝</button>
+            <button class="install-close" id="installClose">✕</button>
+        </div>
+    </div>
+
+    <!-- Main Layout -->
+    <div class="main-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-icon">⚙️</span>
+                <h2>回測參數設定</h2>
+            </div>
+
+            <!-- Date Range Section -->
+            <div class="config-section">
+                <div class="section-title">
+                    <span>📅</span>
+                    <span>回測期間</span>
+                </div>
+                <div class="date-inputs">
+                    <div class="input-group">
+                        <label>開始日期</label>
+                        <input type="date" id="startDate" value="2015-01-01" class="form-control">
+                    </div>
+                    <div class="input-group">
+                        <label>結束日期</label>
+                        <input type="date" id="endDate" class="form-control">
+                    </div>
+                </div>
+            </div>
+
+            <!-- MA Settings Section -->
+            <div class="config-section">
+                <div class="section-title">
+                    <span>📈</span>
+                    <span>均線設定</span>
+                </div>
+                <div class="toggle-group">
+                    <label class="toggle">
+                        <input type="checkbox" id="autoOptimize">
+                        <span class="toggle-slider"></span>
+                        <span class="toggle-label">自動優化 MA 天數</span>
+                    </label>
+                </div>
+                <!-- Auto-optimize range -->
+                <div class="input-group auto-optimize-range" id="autoOptimizeRange" style="display: none;">
+                    <label>優化範圍</label>
+                    <div class="range-inputs">
+                        <input type="number" id="maMin" value="5" min="1" max="100" class="form-control"
+                            placeholder="最小">
+                        <span class="range-separator">~</span>
+                        <input type="number" id="maMax" value="60" min="1" max="200" class="form-control"
+                            placeholder="最大">
+                    </div>
+                </div>
+                <!-- Top 3 MA Results -->
+                <div class="top3-results" id="top3Results" style="display: none;">
+                    <div class="top3-header">🏆 前三名 MA 優化結果</div>
+                    <div class="top3-list" id="top3List">
+                        <!-- Will be populated by JS -->
+                    </div>
+                    <div class="select-ma-hint">✅ 勾選要使用的 MA 進行回測</div>
+                </div>
+                <div class="input-group manual-ma" id="manualMaGroup">
+                    <label>MA 天數</label>
+                    <div class="number-input">
+                        <button class="num-btn minus" data-target="maDays">−</button>
+                        <input type="number" id="maDays" value="13" min="1" max="200" class="form-control">
+                        <button class="num-btn plus" data-target="maDays">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trading Mode Section -->
+            <div class="config-section">
+                <div class="section-title">
+                    <span>🎯</span>
+                    <span>交易模式</span>
+                </div>
+                <div class="select-group">
+                    <select id="tradeMode" class="form-control">
+                        <option value="long">只做多</option>
+                        <option value="short">只做空</option>
+                        <option value="both">多空皆做</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Capital Settings Section -->
+            <div class="config-section">
+                <div class="section-title">
+                    <span>💰</span>
+                    <span>資金設定</span>
+                </div>
+                <div class="input-group">
+                    <label>初始資金</label>
+                    <div class="input-with-unit">
+                        <input type="number" id="initialCapital" value="1000000" class="form-control">
+                        <span class="unit">TWD</span>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>每月加碼</label>
+                    <div class="input-with-unit">
+                        <input type="number" id="monthlyAdd" value="0" class="form-control">
+                        <span class="unit">TWD</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Leverage Settings Section -->
+            <div class="config-section">
+                <div class="section-title">
+                    <span>⚡</span>
+                    <span>槓桿設定</span>
+                </div>
+                <div class="input-group leverage-option">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="useFixedLeverage" checked>
+                        <span class="checkbox-custom"></span>
+                        <span>固定槓桿</span>
+                    </label>
+                    <div class="slider-container" id="fixedLeverageContainer">
+                        <input type="range" id="fixedLeverage" min="1" max="10" value="1" class="slider">
+                        <span class="slider-value" id="fixedLeverageValue">1x</span>
+                    </div>
+                </div>
+                <div class="input-group leverage-option">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="useDynamicLeverage">
+                        <span class="checkbox-custom"></span>
+                        <span>動態槓桿</span>
+                    </label>
+                    <div class="slider-container disabled" id="dynamicLeverageContainer">
+                        <input type="range" id="dynamicLeverage" min="1" max="10" value="1" class="slider" disabled>
+                        <span class="slider-value" id="dynamicLeverageValue">1x</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Other Settings Section -->
+            <div class="config-section">
+                <div class="section-title">
+                    <span>🔧</span>
+                    <span>其他設定</span>
+                </div>
+                <div class="input-group rebalance-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="enableRebalance" checked>
+                        <span class="checkbox-custom"></span>
+                        <span>啟用再平衡</span>
+                    </label>
+                    <div class="rebalance-period" id="rebalancePeriodGroup">
+                        <label>週期（月）</label>
+                        <input type="number" id="rebalancePeriod" value="1" min="1" max="12" class="form-control small">
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>每點價值</label>
+                    <div class="input-with-unit">
+                        <input type="number" id="pointValue" value="50" class="form-control">
+                        <span class="unit">TWD</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Run Button -->
+            <button class="btn-primary run-backtest" id="runBacktest">
+                <span class="btn-icon">▶️</span>
+                <span>執行回測</span>
+                <div class="btn-shine"></div>
+            </button>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Data Source Card -->
+            <div class="card data-source-card">
+                <div class="card-header">
+                    <span class="card-icon">📡</span>
+                    <h3>資料來源</h3>
+                </div>
+                <div class="card-body">
+                    <div class="radio-group">
+                        <label class="radio-item active">
+                            <input type="radio" name="dataSource" value="yahoo" checked>
+                            <span class="radio-custom"></span>
+                            <span class="radio-label">Yahoo Finance</span>
+                            <span class="radio-badge live">即時</span>
+                        </label>
+                        <label class="radio-item">
+                            <input type="radio" name="dataSource" value="manual">
+                            <span class="radio-custom"></span>
+                            <span class="radio-label">手動上傳檔案</span>
+                        </label>
+                    </div>
+                    <div class="data-status success">
+                        <span class="status-icon">✅</span>
+                        <span>資料已載入：2006-01-02 ~ 2026-01-03（共 4,893 筆）</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Market Trend Card (New) -->
+            <div class="card trend-card">
+                <div class="card-header">
+                    <span class="card-icon">📈</span>
+                    <h3>大盤走勢</h3>
+                    <div class="period-tabs">
+                        <button class="period-tab" data-period="3y">3年</button>
+                        <button class="period-tab active" data-period="5y">5年</button>
+                        <button class="period-tab" data-period="10y">10年</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container trend-chart-container">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                    <div class="trend-legend">
+                        <span class="trend-legend-item"><span class="legend-line blue"></span>加權指數</span>
+                        <span class="trend-legend-item"><span class="legend-line orange"></span>MA 均線</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Market Judgment Card -->
+            <div class="card market-card">
+                <div class="card-header">
+                    <span class="card-icon">🎯</span>
+                    <h3>最新市場判斷</h3>
+                    <span class="update-time" id="updateTime">更新於 --</span>
+                </div>
+                <div class="card-body">
+                    <div class="market-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">最新收盤價</span>
+                            <span class="stat-value" id="latestPrice">28,198.02</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">MA(<span id="maLabel">13</span>)</span>
+                            <span class="stat-value" id="maValue">27,859.76</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">價差</span>
+                            <span class="stat-value positive" id="priceDiff">+338.26</span>
+                        </div>
+                    </div>
+                    <div class="signal-box long" id="signalBox">
+                        <div class="signal-icon">📈</div>
+                        <div class="signal-text">
+                            <span class="signal-label">建議</span>
+                            <span class="signal-value" id="signalText">做多</span>
+                        </div>
+                        <div class="signal-reason" id="signalReason">收盤價 > 13日均線</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 100-Day Signal Chart Card -->
+            <div class="card chart-card">
+                <div class="card-header">
+                    <span class="card-icon">📊</span>
+                    <h3>近 100 日多空建議趨勢圖</h3>
+                    <div class="chart-legend">
+                        <span class="legend-item long"><span class="legend-dot"></span>做多</span>
+                        <span class="legend-item short"><span class="legend-dot"></span>做空</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="signalChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Backtest Results Card (Initially Hidden) -->
+            <div class="card results-card" id="resultsCard" style="display: none;">
+                <div class="card-header">
+                    <span class="card-icon">📋</span>
+                    <h3>回測結果</h3>
+                </div>
+                <div class="card-body">
+                    <div class="results-grid">
+                        <div class="result-item">
+                            <span class="result-label">回測期間</span>
+                            <span class="result-value" id="resultPeriod">--</span>
+                        </div>
+                        <div class="result-item highlight">
+                            <span class="result-label">最終資產</span>
+                            <span class="result-value" id="resultFinal">--</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">總報酬率</span>
+                            <span class="result-value" id="resultReturn">--</span>
+                        </div>
+                        <div class="result-item danger">
+                            <span class="result-label">最大回撤 (MDD)</span>
+                            <span class="result-value" id="resultMDD">--</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">勝率</span>
+                            <span class="result-value" id="resultWinRate">--</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">交易次數</span>
+                            <span class="result-value" id="resultTrades">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MDD Chart Card (Initially Hidden) -->
+            <div class="card mdd-card" id="mddCard" style="display: none;">
+                <div class="card-header">
+                    <span class="card-icon">📉</span>
+                    <h3>最大回撤 (MDD) 走勢圖</h3>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="mddChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trade Details Card (Initially Hidden) -->
+            <div class="card trades-card" id="tradesCard" style="display: none;">
+                <div class="card-header">
+                    <span class="card-icon">📝</span>
+                    <h3>交易明細</h3>
+                    <button class="btn-toggle-trades" id="toggleTrades">
+                        <span>展開</span>
+                        <span class="toggle-icon">▼</span>
+                    </button>
+                </div>
+                <div class="card-body trades-body" id="tradesBody" style="display: none;">
+                    <div class="table-container">
+                        <table class="trades-table" id="tradesTable">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>進場日期</th>
+                                    <th>進場價格</th>
+                                    <th>出場日期</th>
+                                    <th>出場價格</th>
+                                    <th>方向</th>
+                                    <th>口數</th>
+                                    <th>損益</th>
+                                    <th>報酬率</th>
+                                    <th>持有天數</th>
+                                    <th>買賣原因</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tradesTableBody">
+                                <!-- Trade rows will be inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>© 2026 Taiwan Stock Backtesting System | Built with ❤️</p>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="js/data.js"></script>
+    <script src="js/chart.js"></script>
+    <script src="js/app.js"></script>
+</body>
+
+</html>
