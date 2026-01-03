@@ -37,6 +37,7 @@ function generateSignalData() {
 }
 
 // Generate market trend data (for 3yr/5yr/10yr charts)
+// Uses realistic historical TAIEX price ranges
 function generateTrendData(years) {
     const dates = [];
     const prices = [];
@@ -45,21 +46,51 @@ function generateTrendData(years) {
     const startDate = new Date(today);
     startDate.setFullYear(startDate.getFullYear() - years);
 
-    let price = 8000 + Math.random() * 2000; // Start around 8000-10000
+    // Realistic TAIEX price ranges by year
+    const priceRanges = {
+        2015: { min: 8000, max: 9500 },
+        2016: { min: 8000, max: 9500 },
+        2017: { min: 9500, max: 10800 },
+        2018: { min: 9500, max: 11200 },
+        2019: { min: 10000, max: 12000 },
+        2020: { min: 9500, max: 14700 },
+        2021: { min: 14000, max: 18000 },
+        2022: { min: 12500, max: 18500 },
+        2023: { min: 14000, max: 17500 },
+        2024: { min: 17000, max: 23000 },
+        2025: { min: 22000, max: 28500 },
+        2026: { min: 25000, max: 30000 }
+    };
+
+    function getBasePrice(year) {
+        const range = priceRanges[year] || priceRanges[2026];
+        return (range.min + range.max) / 2;
+    }
+
     const maPeriod = 60; // 60-day MA for trend chart
     const priceHistory = [];
 
+    let prevPrice = getBasePrice(startDate.getFullYear());
     const current = new Date(startDate);
+
     while (current <= today) {
         // Skip weekends
         if (current.getDay() !== 0 && current.getDay() !== 6) {
             dates.push(current.toISOString().split('T')[0]);
 
-            // Simulate price movement with upward bias
-            const change = (Math.random() - 0.48) * 200;
-            price = Math.max(6000, price + change);
+            const year = current.getFullYear();
+            const range = priceRanges[year] || priceRanges[2026];
+
+            // Simulate price movement within year's range
+            const change = (Math.random() - 0.48) * (range.max - range.min) * 0.02;
+            let price = prevPrice + change;
+
+            // Keep price within realistic range for the year
+            price = Math.max(range.min * 0.95, Math.min(range.max * 1.05, price));
+
             prices.push(price);
             priceHistory.push(price);
+            prevPrice = price;
 
             // Calculate MA
             if (priceHistory.length >= maPeriod) {
@@ -140,6 +171,7 @@ function generateTop3MA(minMA, maxMA) {
 }
 
 // Generate sample trade data with contracts and reasons
+// Uses realistic historical TAIEX price ranges
 function generateSampleTrades() {
     const trades = [];
     const today = new Date();
@@ -162,6 +194,32 @@ function generateSampleTrades() {
         '停損出場'
     ];
 
+    // Realistic TAIEX price ranges by year
+    // 2015: ~8000-9500, 2016: ~8000-9500, 2017: ~9500-10800
+    // 2018: ~9500-11200, 2019: ~10000-12000, 2020: ~9500-14700
+    // 2021: ~14000-18000, 2022: ~12500-18500, 2023: ~14000-17500
+    // 2024: ~17000-23000, 2025+: ~22000-28000
+    function getRealisticPrice(date) {
+        const year = date.getFullYear();
+        const priceRanges = {
+            2015: { min: 8000, max: 9500 },
+            2016: { min: 8000, max: 9500 },
+            2017: { min: 9500, max: 10800 },
+            2018: { min: 9500, max: 11200 },
+            2019: { min: 10000, max: 12000 },
+            2020: { min: 9500, max: 14700 },
+            2021: { min: 14000, max: 18000 },
+            2022: { min: 12500, max: 18500 },
+            2023: { min: 14000, max: 17500 },
+            2024: { min: 17000, max: 23000 },
+            2025: { min: 22000, max: 28500 },
+            2026: { min: 25000, max: 30000 }
+        };
+
+        const range = priceRanges[year] || priceRanges[2026];
+        return range.min + Math.random() * (range.max - range.min);
+    }
+
     let tradeId = 1;
     let currentDate = new Date(startDate);
 
@@ -173,9 +231,13 @@ function generateSampleTrades() {
 
         if (exitDate > today) break;
 
-        const entryPrice = 10000 + Math.random() * 18000;
+        // Get realistic price for the entry date
+        const entryPrice = getRealisticPrice(entryDate);
         const direction = Math.random() > 0.4 ? 'long' : 'short';
-        const priceChange = (Math.random() - 0.45) * 1000;
+
+        // Price change proportional to the price level (about 1-5%)
+        const priceChangePercent = (Math.random() - 0.45) * 0.05;
+        const priceChange = entryPrice * priceChangePercent;
         const exitPrice = direction === 'long'
             ? entryPrice + priceChange
             : entryPrice - priceChange;
