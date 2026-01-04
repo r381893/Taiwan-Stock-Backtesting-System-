@@ -768,11 +768,13 @@ body {
 }
 
 .stat-value.positive {
-    color: var(--success);
+    color: var(--danger);
+    /* Red for positive/up */
 }
 
 .stat-value.negative {
-    color: var(--danger);
+    color: var(--success);
+    /* Green for negative/down */
 }
 
 /* Signal Box */
@@ -787,15 +789,17 @@ body {
 }
 
 .signal-box.long {
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05));
-    border: 1px solid rgba(16, 185, 129, 0.3);
-    box-shadow: var(--shadow-glow-green);
-}
-
-.signal-box.short {
+    /* Red for Long */
     background: linear-gradient(135deg, rgba(244, 63, 94, 0.15), rgba(244, 63, 94, 0.05));
     border: 1px solid rgba(244, 63, 94, 0.3);
     box-shadow: var(--shadow-glow-red);
+}
+
+.signal-box.short {
+    /* Green for Short */
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05));
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    box-shadow: var(--shadow-glow-green);
 }
 
 .signal-icon {

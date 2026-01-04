@@ -7,9 +7,15 @@
 // API 配置
 // ============================================
 // 自動偵測環境：本地開發使用 localhost:5000，線上部署使用當前 origin
-const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+// 如果是 file:// 協議（直接開啟 HTML 檔案），也使用 localhost:5000
+const API_BASE = (window.location.protocol === 'file:' ||
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname === '')
     ? 'http://localhost:5000'
     : window.location.origin;
+
+console.log('[API] API_BASE:', API_BASE, '(protocol:', window.location.protocol, ')');
 
 // 是否使用真實 API（設為 false 則使用模擬數據）
 let USE_REAL_API = true;

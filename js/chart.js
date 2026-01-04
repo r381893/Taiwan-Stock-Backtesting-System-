@@ -81,10 +81,10 @@ async function initSignalChart(maDays = 13) {
     const { dates, signals } = chartData;
 
     const backgroundColors = signals.map(s =>
-        s === 1 ? 'rgba(16, 185, 129, 0.8)' : 'rgba(244, 63, 94, 0.8)'
+        s === 1 ? 'rgba(244, 63, 94, 0.8)' : 'rgba(16, 185, 129, 0.8)'
     );
     const borderColors = signals.map(s =>
-        s === 1 ? 'rgb(16, 185, 129)' : 'rgb(244, 63, 94)'
+        s === 1 ? 'rgb(244, 63, 94)' : 'rgb(16, 185, 129)'
     );
 
     // Destroy existing chart if any
