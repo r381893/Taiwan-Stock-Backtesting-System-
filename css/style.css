@@ -873,11 +873,13 @@ body {
 }
 
 .legend-item.long .legend-dot {
-    background: var(--success);
+    background: var(--danger);
+    /* Red for Long */
 }
 
 .legend-item.short .legend-dot {
-    background: var(--danger);
+    background: var(--success);
+    /* Green for Short */
 }
 
 .chart-container {
