@@ -7,10 +7,78 @@ let signalChart = null;
 let mddChart = null;
 let trendChart = null;
 
-// Initialize the signal trend chart
-function initSignalChart() {
+// Initialize the signal trend chart with real API data
+async function initSignalChart(maDays = 13) {
     const ctx = document.getElementById('signalChart').getContext('2d');
-    const { dates, signals } = window.appData.generateSignalData();
+    let chartData;
+
+    try {
+        // 獲取最近 200 天數據（確保有足夠數據計算均線和取 100 日信號）
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(endDate.getDate() - 200);
+
+        const startDateStr = startDate.toISOString().split('T')[0];
+        const endDateStr = endDate.toISOString().split('T')[0];
+
+        console.log(`[SignalChart] Fetching data from ${startDateStr} to ${endDateStr}...`);
+        const response = await window.appData.fetchMarketData(startDateStr, endDateStr);
+
+        if (response && response.success && response.data.length > 0) {
+            const prices = response.data.map(d => d.close);
+            const allDates = response.data.map(d => d.date);
+            const signals = [];
+            const validDates = [];
+
+            // 計算每日信號：價格 > MA 為做多 (1)，否則為做空 (-1)
+            for (let i = 0; i < prices.length; i++) {
+                if (i < maDays - 1) continue; // 需要足夠數據計算均線
+
+                let sum = 0;
+                for (let j = 0; j < maDays; j++) {
+                    sum += prices[i - j];
+                }
+                const ma = sum / maDays;
+                signals.push(prices[i] > ma ? 1 : -1);
+                validDates.push(allDates[i]);
+            }
+
+            // 只取最近 100 個信號
+            const last100 = Math.max(0, signals.length - 100);
+            chartData = {
+                dates: validDates.slice(last100),
+                signals: signals.slice(last100)
+            };
+            console.log(`[SignalChart] Loaded ${chartData.signals.length} signals from API (MA${maDays})`);
+        } else {
+            throw new Error('API returned no data');
+        }
+    } catch (error) {
+        console.error('[SignalChart] Failed to load real data:', error);
+        // 顯示錯誤訊息而非假資料
+        if (signalChart) {
+            signalChart.destroy();
+        }
+        signalChart = new Chart(ctx, {
+            type: 'bar',
+            data: { labels: [], datasets: [] },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: '⚠️ 無法載入信號數據，請確認 API 伺服器已啟動',
+                        color: '#f43f5e',
+                        font: { size: 14 }
+                    }
+                }
+            }
+        });
+        return signalChart;
+    }
+
+    const { dates, signals } = chartData;
 
     const backgroundColors = signals.map(s =>
         s === 1 ? 'rgba(16, 185, 129, 0.8)' : 'rgba(244, 63, 94, 0.8)'
@@ -18,6 +86,11 @@ function initSignalChart() {
     const borderColors = signals.map(s =>
         s === 1 ? 'rgb(16, 185, 129)' : 'rgb(244, 63, 94)'
     );
+
+    // Destroy existing chart if any
+    if (signalChart) {
+        signalChart.destroy();
+    }
 
     signalChart = new Chart(ctx, {
         type: 'bar',
@@ -136,8 +209,29 @@ async function initTrendChart(years = 5) {
         }
 
     } catch (error) {
-        console.warn('[TrendChart] Failed to load real data, using mock data:', error);
-        chartData = window.appData.generateTrendData(years);
+        console.error('[TrendChart] Failed to load real data:', error);
+        // 不使用假資料，直接顯示錯誤訊息
+        if (trendChart) {
+            trendChart.destroy();
+        }
+        // 建立一個空的圖表並顯示錯誤訊息
+        trendChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: [], datasets: [] },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: '⚠️ 無法載入資料，請確認 API 伺服器已啟動',
+                        color: '#f43f5e',
+                        font: { size: 14 }
+                    }
+                }
+            }
+        });
+        return trendChart;
     }
 
     const { dates, prices, maValues } = chartData;
@@ -386,17 +480,10 @@ function initMddChartWithData(dates, mddValues) {
 }
 
 
-// Update signal chart
-function updateSignalChart() {
-    if (signalChart) {
-        const { dates, signals } = window.appData.generateSignalData();
-        signalChart.data.labels = dates;
-        signalChart.data.datasets[0].data = signals;
-        signalChart.data.datasets[0].backgroundColor = signals.map(s =>
-            s === 1 ? 'rgba(16, 185, 129, 0.8)' : 'rgba(244, 63, 94, 0.8)'
-        );
-        signalChart.update('active');
-    }
+// Update signal chart with real API data
+async function updateSignalChart(maDays = 13) {
+    // Reinitialize with new MA days using real API data
+    await initSignalChart(maDays);
 }
 
 // Update MDD chart

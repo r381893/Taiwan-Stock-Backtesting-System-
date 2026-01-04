@@ -24,7 +24,8 @@ document.addEventListener('DOMContentLoaded', function () {
     updateMarketDisplay();
 
     // Initialize charts
-    window.chartModule.initSignalChart();
+    const maDays = parseInt(document.getElementById('maDays').value) || 13;
+    window.chartModule.initSignalChart(maDays);
     window.chartModule.initTrendChart(5); // Default 5 years
 
     // Apply auto theme based on market sentiment
@@ -426,7 +427,7 @@ function initRadioButtons() {
  * Update market display with current data (from API or fallback)
  */
 async function updateMarketDisplay() {
-    const { formatNumber, calculateSignal, fetchMarketStatus, marketData } = window.appData;
+    const { formatNumber, calculateSignal, fetchMarketStatus } = window.appData;
     const maDays = parseInt(document.getElementById('maDays').value) || 13;
 
     let latestPrice, maValue, latestDate;
@@ -443,10 +444,15 @@ async function updateMarketDisplay() {
             throw new Error('API returned unsuccessful');
         }
     } catch (error) {
-        console.warn('[Market] API failed, using fallback data:', error);
-        latestPrice = marketData.latestPrice;
-        maValue = marketData.ma13;
-        latestDate = marketData.latestDate;
+        console.error('[Market] API failed:', error);
+        // 不再使用假資料，而是顯示錯誤狀態
+        document.getElementById('updateTime').textContent = '⚠️ API 連線失敗';
+        document.getElementById('latestPrice').textContent = '---';
+        document.getElementById('maValue').textContent = '---';
+        document.getElementById('priceDiff').textContent = '---';
+        document.getElementById('priceDiff').className = 'stat-value';
+        showToast('無法連接 API 伺服器，請確認後端已啟動', 'error');
+        return;
     }
 
     // Update date
@@ -655,8 +661,8 @@ async function runRealBacktest(params, doOptimize) {
             '<tr><td colspan="11" style="text-align:center;">無交易記錄</td></tr>';
     }
 
-    // Update signal chart
-    window.chartModule.updateSignalChart();
+    // Update signal chart with backtest MA
+    window.chartModule.updateSignalChart(params.maDays);
 
     // Scroll to results
     resultsCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -716,7 +722,8 @@ async function runMockBacktest(doOptimize) {
     populateTradesTable(generateSampleTrades());
 
     // Update signal chart
-    window.chartModule.updateSignalChart();
+    const maDays = parseInt(document.getElementById('maDays').value) || 13;
+    window.chartModule.updateSignalChart(maDays);
 
     // Scroll to results
     resultsCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
