@@ -244,6 +244,23 @@
                         <input type="number" id="rebalancePeriod" value="1" min="1" max="12" class="form-control small">
                     </div>
                 </div>
+                <div class="input-group backwardation-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="enableBackwardation">
+                        <span class="checkbox-custom"></span>
+                        <span>逆價差補償</span>
+                    </label>
+                    <div class="backwardation-rate" id="backwardationRateGroup" style="display: none;">
+                        <label>年化補償</label>
+                        <select id="backwardationRate" class="form-control small">
+                            <option value="2">2%</option>
+                            <option value="3">3%</option>
+                            <option value="4" selected>4%</option>
+                            <option value="5">5%</option>
+                            <option value="6">6%</option>
+                        </select>
+                    </div>
+                </div>
                 <div class="input-group">
                     <label>每點價值</label>
                     <div class="input-with-unit">

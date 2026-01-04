@@ -77,6 +77,10 @@ def run_backtest(df, params):
     fixed_lots = params.get('fixedLots', 1)
     lot_mode = params.get('lotMode', 'dynamic')  # 'fixed' or 'dynamic'
     
+    # 逆價差補償參數
+    enable_backwardation = params.get('enableBackwardation', False)
+    backwardation_rate = params.get('backwardationRate', 4)  # 年化百分比
+    
     # 確定實際使用的槓桿
     if lot_mode == 'fixed':
         leverage = fixed_leverage if use_fixed_leverage else 1
@@ -147,6 +151,16 @@ def run_backtest(df, params):
             else:  # 空單
                 daily_pnl = (prev_price - current_price) * current_lots * point_value
             capital += daily_pnl
+            
+            # ========== 逆價差補償：每日按年化比例增加損益 ==========
+            if enable_backwardation and backwardation_rate > 0:
+                # 年化收益率轉為每日收益率 (假設一年約 252 個交易日)
+                daily_backwardation_rate = backwardation_rate / 100 / 252
+                # 依據持倉市值計算每日逆價差補償
+                position_value = current_lots * current_price * point_value
+                backwardation_gain = position_value * daily_backwardation_rate
+                capital += backwardation_gain
+            
             days_since_rebalance += 1
             
             # 定期再平衡（僅在動態口數模式下）

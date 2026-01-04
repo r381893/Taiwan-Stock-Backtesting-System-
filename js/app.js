@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', function () {
     initRadioButtons();
     initLeverageControls();
     initRebalanceControl();
+    initBackwardationControl();
     initAutoOptimize();
     initThemeSelector();
     initPeriodTabs();
@@ -342,6 +343,24 @@ function initRebalanceControl() {
 }
 
 /**
+ * Initialize backwardation compensation control
+ */
+function initBackwardationControl() {
+    const enableBackwardation = document.getElementById('enableBackwardation');
+    const backwardationRateGroup = document.getElementById('backwardationRateGroup');
+
+    if (!enableBackwardation || !backwardationRateGroup) return;
+
+    enableBackwardation.addEventListener('change', function () {
+        if (this.checked) {
+            backwardationRateGroup.style.display = 'flex';
+        } else {
+            backwardationRateGroup.style.display = 'none';
+        }
+    });
+}
+
+/**
  * Initialize auto-optimize controls
  */
 function initAutoOptimize() {
@@ -574,7 +593,9 @@ function collectBacktestParams() {
         fixedLots: 1,
         useFee: true,
         buyFee: 35,
-        sellFee: 35
+        sellFee: 35,
+        enableBackwardation: document.getElementById('enableBackwardation')?.checked || false,
+        backwardationRate: parseFloat(document.getElementById('backwardationRate')?.value) || 4
     };
 }
 

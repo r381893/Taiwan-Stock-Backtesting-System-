@@ -17,7 +17,7 @@ CORS(app)  # 允許跨域請求
 
 # 快取檔案路徑
 CACHE_FILE = 'stock_data_cache.csv'
-CACHE_EXPIRY_HOURS = 24
+CACHE_EXPIRY_HOURS = 0.08  # 約 5 分鐘，確保資料新鮮度
 
 
 def load_stock_data(start_date=None, end_date=None):
