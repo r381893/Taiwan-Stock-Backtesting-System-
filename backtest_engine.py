@@ -337,7 +337,7 @@ def optimize_ma(df, params):
     # 根據範圍大小決定步長，避免超時 (Render 限制 30-50秒)
     # 限制最大迭代次數約為 12 次
     ma_range = ma_max - ma_min
-    target_iterations = 12
+    target_iterations = 6
     step = max(1, ma_range // target_iterations)
         
     for ma in range(ma_min, ma_max + 1, step):
